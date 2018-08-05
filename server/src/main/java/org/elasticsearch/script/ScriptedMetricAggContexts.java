@@ -42,14 +42,28 @@ public class ScriptedMetricAggContexts {
         "Set system property es.aggregations.enable_scripted_metric_agg_param = false to disable this deprecated behavior.";
 
     public static boolean deprecatedAggParamEnabled() {
-        boolean enabled = Boolean.parseBoolean(
-            System.getProperty("es.aggregations.enable_scripted_metric_agg_param", "true"));
+        return Boolean.parseBoolean(System.getProperty("es.aggregations.enable_scripted_metric_agg_param", "true"));
+    }
 
-        if (enabled) {
-            DEPRECATION_LOGGER.deprecatedAndMaybeLog("enable_scripted_metric_agg_param", AGG_PARAM_DEPRECATION_WARNING);
+    public static void emitDeprecationWarning() {
+        DEPRECATION_LOGGER.deprecatedAndMaybeLog("enable_scripted_metric_agg_param", AGG_PARAM_DEPRECATION_WARNING);
+    }
+
+    public static boolean deprecatedParamModified(Map<String, Object> params) {
+        if (params.containsKey("_agg") == false) {
+            return false;
         }
 
-        return enabled;
+        // _agg is "used" if it's had values added to it, or if it's not a map (meaning it was supplied explicitly as
+        // some other type.
+        Object agg = params.get("_agg");
+        return agg instanceof Map == false || ((Map) agg).isEmpty() == false;
+    }
+
+    public static void checkDeprecatedParam(Map<String, Object> params) {
+        if (deprecatedAggParamEnabled() && deprecatedParamModified(params)) {
+            emitDeprecationWarning();
+        }
     }
 
     private abstract static class ParamsAndStateBase {

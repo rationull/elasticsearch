@@ -47,7 +47,6 @@ import java.util.function.Function;
 import static java.util.Collections.singleton;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.sameInstance;
 
 /**
  * This test verifies that the _agg param is added correctly when the system property
@@ -74,26 +73,23 @@ public class ScriptedMetricAggregatorAggStateV6CompatTests extends AggregatorTes
     @BeforeClass
     @SuppressWarnings("unchecked")
     public static void initMockScripts() {
-        // If _agg is provided implicitly, it should be the same objects as "state" from the context.
         SCRIPTS.put("initScript", params -> {
             Object agg = params.get("_agg");
-            Object state = params.get("state");
             assertThat(agg, instanceOf(Map.class));
-            assertThat(agg, sameInstance(state));
+
+            // Modify the deprecated param so it'll trigger a deprecation warning
+            ((Map) agg).put("field", "value");
+
             return agg;
         });
         SCRIPTS.put("mapScript", params -> {
             Object agg = params.get("_agg");
-            Object state = params.get("state");
             assertThat(agg, instanceOf(Map.class));
-            assertThat(agg, sameInstance(state));
             return agg;
         });
         SCRIPTS.put("combineScript", params -> {
             Object agg = params.get("_agg");
-            Object state = params.get("state");
             assertThat(agg, instanceOf(Map.class));
-            assertThat(agg, sameInstance(state));
             return agg;
         });
 
@@ -158,6 +154,35 @@ public class ScriptedMetricAggregatorAggStateV6CompatTests extends AggregatorTes
                     .mapScript(MAP_SCRIPT_EXPLICIT_AGG)
                     .combineScript(COMBINE_SCRIPT_EXPLICIT_AGG);
                 search(newSearcher(indexReader, true, true), new MatchAllDocsQuery(), aggregationBuilder);
+            }
+        }
+
+        assertWarnings(ScriptedMetricAggContexts.AGG_PARAM_DEPRECATION_WARNING);
+    }
+
+    /**
+     * Test that without a combine script, when the _agg object is used it is the result of the aggregation for each shard.
+     */
+    public void testWithoutCombineScript() throws IOException {
+        try (Directory directory = newDirectory()) {
+            Integer numDocs = 10;
+            try (RandomIndexWriter indexWriter = new RandomIndexWriter(random(), directory)) {
+                for (int i = 0; i < numDocs; i++) {
+                    indexWriter.addDocument(singleton(new SortedNumericDocValuesField("number", i)));
+                }
+            }
+
+            Map<String, Object> aggParams = new HashMap<>();
+            aggParams.put("_agg", EXPLICIT_AGG_OBJECT);
+
+            try (IndexReader indexReader = DirectoryReader.open(directory)) {
+                ScriptedMetricAggregationBuilder aggregationBuilder = new ScriptedMetricAggregationBuilder(AGG_NAME);
+                aggregationBuilder
+                    .params(aggParams)
+                    .initScript(INIT_SCRIPT_EXPLICIT_AGG)
+                    .mapScript(MAP_SCRIPT_EXPLICIT_AGG);
+                ScriptedMetric scriptedMetric = search(newSearcher(indexReader, true, true), new MatchAllDocsQuery(), aggregationBuilder);
+                assertEquals(EXPLICIT_AGG_OBJECT, scriptedMetric.aggregation());
             }
         }
 

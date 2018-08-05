@@ -123,4 +123,18 @@ public class ScriptedMetricAggContextsTests extends ScriptTestCase {
         Object res = script.execute();
         assertEquals(3, res);
     }
+
+    public void testDeprecatedParamModified() {
+        Map<String, Object> emptyAgg = Collections.emptyMap();
+        Map<String, Object> modifiedAgg = Collections.singletonMap("field", "value");
+        List<Object> listAgg = Collections.emptyList();
+        Integer intAgg = 3;
+
+        assertFalse(ScriptedMetricAggContexts.deprecatedParamModified(Collections.emptyMap()));
+        assertFalse(ScriptedMetricAggContexts.deprecatedParamModified(Collections.singletonMap("_agg", emptyAgg)));
+
+        assertTrue(ScriptedMetricAggContexts.deprecatedParamModified(Collections.singletonMap("_agg", modifiedAgg)));
+        assertTrue(ScriptedMetricAggContexts.deprecatedParamModified(Collections.singletonMap("_agg", listAgg)));
+        assertTrue(ScriptedMetricAggContexts.deprecatedParamModified(Collections.singletonMap("_agg", intAgg)));
+    }
 }

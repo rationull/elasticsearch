@@ -87,11 +87,11 @@ public class ScriptedMetricAggregatorFactory extends AggregatorFactory<ScriptedM
         if (ScriptedMetricAggContexts.deprecatedAggParamEnabled()) {
             if (aggParams.containsKey("_agg") == false) {
                 // Add _agg if it wasn't added manually
-                aggParams.put("_agg", aggState);
+                aggParams.put("_agg", new HashMap<>());
             } else {
-                // If it was added manually, also use it for the agg context variable to reduce the likelihood of
-                // weird behavior due to multiple different variables.
-                aggState = aggParams.get("_agg");
+                // If it was added manually, emit a deprecation warning since this case will no longer be supported
+                // with the move to the 'state' context variable.
+                ScriptedMetricAggContexts.emitDeprecationWarning();
             }
         }
 
@@ -106,9 +106,12 @@ public class ScriptedMetricAggregatorFactory extends AggregatorFactory<ScriptedM
         if (initScript != null) {
             initScript.execute();
             CollectionUtils.ensureNoSelfReferences(aggState, "Scripted metric aggs init script");
+
+            // Emit a deprecation warning if the deprecated params[_agg] was modified in the script.
+            ScriptedMetricAggContexts.checkDeprecatedParam(initScript.getParams());
         }
         return new ScriptedMetricAggregator(name, mapScript,
-                combineScript, reduceScript, aggState, context, parent,
+                combineScript, reduceScript, aggParams, aggState, context, parent,
                 pipelineAggregators, metaData);
     }
 

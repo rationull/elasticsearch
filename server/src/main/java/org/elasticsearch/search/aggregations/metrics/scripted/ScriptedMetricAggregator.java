@@ -41,13 +41,15 @@ public class ScriptedMetricAggregator extends MetricsAggregator {
     private final ScriptedMetricAggContexts.MapScript.LeafFactory mapScript;
     private final ScriptedMetricAggContexts.CombineScript combineScript;
     private final Script reduceScript;
+    private Map<String, Object> aggParams;
     private Object aggState;
 
     protected ScriptedMetricAggregator(String name, ScriptedMetricAggContexts.MapScript.LeafFactory mapScript, ScriptedMetricAggContexts.CombineScript combineScript,
-                                       Script reduceScript, Object aggState, SearchContext context, Aggregator parent,
+                                       Script reduceScript, Map<String, Object> aggParams, Object aggState, SearchContext context, Aggregator parent,
                                        List<PipelineAggregator> pipelineAggregators, Map<String, Object> metaData)
                                        throws IOException {
         super(name, context, parent, pipelineAggregators, metaData);
+        this.aggParams = aggParams;
         this.aggState = aggState;
         this.mapScript = mapScript;
         this.combineScript = combineScript;
@@ -76,6 +78,9 @@ public class ScriptedMetricAggregator extends MetricsAggregator {
                 leafMapScript.setDocument(doc);
                 leafMapScript.execute();
                 CollectionUtils.ensureNoSelfReferences(aggState, "Scripted metric aggs map script");
+
+                // Emit a deprecation warning if the deprecated params[_agg] was modified in the script.
+                ScriptedMetricAggContexts.checkDeprecatedParam(leafMapScript.getParams());
             }
         };
     }
@@ -86,8 +91,17 @@ public class ScriptedMetricAggregator extends MetricsAggregator {
         if (combineScript != null) {
             aggregation = combineScript.execute();
             CollectionUtils.ensureNoSelfReferences(aggregation, "Scripted metric aggs combine script");
+
+            // Emit a deprecation warning if the deprecated params[_agg] was modified in the script.
+            ScriptedMetricAggContexts.checkDeprecatedParam(combineScript.getParams());
         } else {
-            aggregation = aggState;
+            // If the deprecated params[_agg] is used, then use it for the aggregation result. Otherwise use shared agg state.
+            if (ScriptedMetricAggContexts.deprecatedAggParamEnabled() &&
+                ScriptedMetricAggContexts.deprecatedParamModified(aggParams)) {
+                aggregation = aggParams.get("_agg");
+            } else {
+                aggregation = aggState;
+            }
         }
         return new InternalScriptedMetric(name, aggregation, reduceScript, pipelineAggregators(),
                 metaData());

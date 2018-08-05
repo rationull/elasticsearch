@@ -23,7 +23,6 @@ import org.elasticsearch.common.io.stream.Writeable.Reader;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.script.MockScriptEngine;
 import org.elasticsearch.script.Script;
-import org.elasticsearch.script.ScriptedMetricAggContexts;
 import org.elasticsearch.script.ScriptEngine;
 import org.elasticsearch.script.ScriptModule;
 import org.elasticsearch.script.ScriptService;
@@ -78,10 +77,9 @@ public class InternalScriptedMetricAggStateV6CompatTests extends InternalAggrega
         return new ScriptService(Settings.EMPTY, engines, ScriptModule.CORE_CONTEXTS);
     }
 
+    // Can't detect use of _aggs in the reduce script since it will not be modified.
     @Override
-    protected void assertReduced(InternalScriptedMetric reduced, List<InternalScriptedMetric> inputs) {
-        assertWarnings(ScriptedMetricAggContexts.AGG_PARAM_DEPRECATION_WARNING);
-    }
+    protected void assertReduced(InternalScriptedMetric reduced, List<InternalScriptedMetric> inputs) {}
 
     @Override
     protected Reader<InternalScriptedMetric> instanceReader() {
