@@ -170,6 +170,7 @@ public class ScriptedMetricAggContexts {
     public abstract static class ReduceScript {
         private final Map<String, Object> params;
         private final List<Object> states;
+        private boolean statesWasAccessed = false;
 
         public ReduceScript(Map<String, Object> params, List<Object> states) {
             this.params = params;
@@ -181,7 +182,12 @@ public class ScriptedMetricAggContexts {
         }
 
         public List<Object> getStates() {
+            statesWasAccessed = true;
             return states;
+        }
+
+        public boolean wasStatesAccessed() {
+            return statesWasAccessed;
         }
 
         public abstract Object execute();

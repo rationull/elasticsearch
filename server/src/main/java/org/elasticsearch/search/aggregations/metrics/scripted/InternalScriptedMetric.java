@@ -107,6 +107,12 @@ public class InternalScriptedMetric extends InternalAggregation implements Scrip
             Object scriptResult = script.execute();
             CollectionUtils.ensureNoSelfReferences(scriptResult, "reduce script");
 
+            // If the reduce script never accessed the 'states' context variable, then it may still be using the deprecated
+            // params._aggs instead.
+            if (script.wasStatesAccessed() == false) {
+                ScriptedMetricAggContexts.emitDeprecationWarning();
+            }
+
             aggregation = Collections.singletonList(scriptResult);
         } else if (reduceContext.isFinalReduce())  {
             aggregation = Collections.singletonList(aggregationObjects);
